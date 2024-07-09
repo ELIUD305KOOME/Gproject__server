@@ -8,33 +8,21 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_restful import Api, Resource
 import os
-from werkzeug.utils import secure_filename
+# from werkzeug.utils import secure_filename
 from models import db, User
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DATABASE = os.environ.get("DB_URI", f"sqlite:///{os.path.join(BASE_DIR, 'app.db')}")
-UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '2#fJ7$kd_9W!sL@0'
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.json.compact = False
 
 db.init_app(app)
 migrate = Migrate(app, db)
 api = Api(app)
-
-# Create uploads directory if it doesn't exist
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-# Serving uploaded files
-@app.route('/uploads/<filename>')
-def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
 
 
 login_manager = LoginManager(app)
@@ -76,14 +64,6 @@ class Users(Resource):
 
     def post(self):
         data = request.form
-        file = request.files.get('display_photo')
-
-        if file:
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            display_photo_url = f"/uploads/{filename}"
-        else:
-            display_photo_url = ''
 
         new_user = User(
             name=data['name'],
@@ -91,8 +71,6 @@ class Users(Resource):
             password=data['password'],
             role=data.get('role', 'user'),
             contacts=data.get("contacts", ''),
-            locations=data.get("locations", ''),
-            display_photo=display_photo_url
         )
         db.session.add(new_user)
         db.session.commit()
@@ -125,27 +103,19 @@ class Login(Resource):
 class UserRegister(Resource):
     def post(self):
         data = request.form
-        file = request.files.get('display_photo')
-
-        if file:
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            display_photo_url = f"/uploads/{filename}"
-        else:
-            display_photo_url = ''
-
+        if User.query.filter_by(email=data['email']).first():
+            return {"error": "Email already exists"}, 400
         new_user = User(
             name=data['name'],
             email=data['email'],
             password=data['password'],
-            role=data.get('role', 'user'),
+            role=data.get('role', ''),
             contacts=data.get("contacts", ''),
-            locations=data.get("locations", ''),
-            display_photo=display_photo_url
         )
         db.session.add(new_user)
         db.session.commit()
         return make_response(new_user.to_dict(), 201)
+    
 
 class UserPasswordReset(Resource):
     @login_required
@@ -178,15 +148,12 @@ class UserProfileUpdate(Resource):
         if user is None:
             return {"error": "User not found"}, 404
         data = request.form
-        file = request.files.get('display_photo')
-
-        if file:
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            user.display_photo = f"/uploads/{filename}"
-
+        
         user.name = data.get('name', user.name)
         user.email = data.get('email', user.email)
+        user.password = data.get('password', user.password)
+        user.role = data.get('role', user.role)
+        user.contacts = data.get('contacts', user.contacts)
         db.session.commit()
         return make_response(user.to_dict(), 200)
     
@@ -196,15 +163,12 @@ class UserProfileUpdate(Resource):
         if user is None:
             return {"error": "User not found"}, 404
         data = request.form
-        file = request.files.get('display_photo')
-
-        if file:
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            user.display_photo = f"/uploads/{filename}"
-
+    
         user.name = data.get('name', user.name)
         user.email = data.get('email', user.email)
+        user.password = data.get('password', user.password)
+        user.role = data.get('role', user.role)
+        user.contacts = data.get('contacts',user.contacts)
         db.session.commit()
         return make_response(user.to_dict(), 200)
 
